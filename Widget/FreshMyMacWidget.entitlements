@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Widget uzantıları sandbox içinde çalışmak zorundadır. -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <!-- Ana uygulamanın yazdığı widget-status.json dosyasını okuyup ön ayarı (preset.json) yazabilmek için. -->
+    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+    <array>
+        <string>/Library/Application Support/FreshMyMac/</string>
+    </array>
+</dict>
+</plist>
