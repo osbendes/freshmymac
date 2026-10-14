@@ -291,7 +291,10 @@ final class AppState {
     private func run(_ request: WidgetRequest) async {
         // Başka bir temizlik sürüyorsa bitmesini bekle; istek kaybolmasın.
         while cleaner.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
-        updateWidgetPhase(WidgetPhase(kind: .cleaning))
+        // Başlangıç: widget'a basıldığı an (widget "requested" yazdıysa), yoksa şimdi.
+        let requested = WidgetPhase.load().flatMap { $0.kind == .requested && $0.isRunning ? $0.date : nil }
+        let startedAt = requested ?? .now
+        updateWidgetPhase(WidgetPhase(kind: .cleaning, startedAt: startedAt))
 
         let phase: WidgetPhase
         switch request.action {
@@ -299,11 +302,11 @@ final class AppState {
             let tasks = request.taskIDs.map { ids in cleaner.tasks.filter { ids.contains($0.id) } }
             let freed = await quickClean(tasks)
             let failure = cleaner.log.first { !$0.success }
-            phase = WidgetPhase(kind: .done, freedBytes: freed, message: failure.map { "\($0.title): \($0.detail)" })
+            phase = WidgetPhase(kind: .done, startedAt: startedAt, freedBytes: freed, message: failure.map { "\($0.title): \($0.detail)" })
         case .flushdns:
             await flushInternetCache()
             let success = cleaner.log.last?.success ?? false
-            phase = WidgetPhase(kind: success ? .done : .failed, message: lastActionMessage)
+            phase = WidgetPhase(kind: success ? .done : .failed, startedAt: startedAt, message: lastActionMessage)
         }
         updateWidgetPhase(phase)
         if !request.background {

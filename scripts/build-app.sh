@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 # Kendi kimliğinizle derlemek için: BUNDLE_ID=com.ornek.FreshMyMac ./scripts/build-app.sh
 BUNDLE_ID="${BUNDLE_ID:-com.osbendes.FreshMyMac}"
-VERSION="${VERSION:-0.2.1}"
+VERSION="${VERSION:-0.2.2}"
 MODE="${1:-}"
 if [[ $MODE == --release ]]; then
     ARCHS=(arm64 x86_64)
@@ -76,7 +76,7 @@ $PLATFORM_KEYS
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
-    <key>CFBundleVersion</key><string>3</string>
+    <key>CFBundleVersion</key><string>4</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>CFBundleURLTypes</key>
@@ -146,7 +146,7 @@ $PLATFORM_KEYS
     <key>CFBundleExecutable</key><string>FreshMyMacWidget</string>
     <key>CFBundlePackageType</key><string>XPC!</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
-    <key>CFBundleVersion</key><string>3</string>
+    <key>CFBundleVersion</key><string>4</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSExtension</key>
     <dict>

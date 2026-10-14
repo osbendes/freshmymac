@@ -118,6 +118,8 @@ struct WidgetPhase: Codable, Sendable, Equatable {
 
     var kind: Kind
     var date: Date = .now
+    /// Temizliğin başladığı an (widget'a basıldığı an); geçen süre sayacı ve toplam süre bundan hesaplanır.
+    var startedAt: Date?
     var freedBytes: Int64?
     var message: String?
 
@@ -130,6 +132,9 @@ struct WidgetPhase: Codable, Sendable, Equatable {
 
     static func load() -> WidgetPhase? { SharedStore.read(WidgetPhase.self, from: fileName) }
     func save() { SharedStore.write(self, to: Self.fileName) }
+
+    /// Temizlik ne kadar sürdü (sonuç aşamasında) ya da ne zamandır sürüyor.
+    var elapsed: TimeInterval { date.timeIntervalSince(startedAt ?? date) }
 
     var isRunning: Bool {
         (kind == .requested || kind == .cleaning) && Date.now.timeIntervalSince(date) < Self.staleAfter

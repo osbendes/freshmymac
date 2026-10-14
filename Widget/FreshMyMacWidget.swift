@@ -119,6 +119,14 @@ struct StatusEntry: TimelineEntry {
     var custom: [String]?
     /// Bu girişte gösterilecek temizlik aşaması (sürüyor ya da sonuç); `nil` ise olağan görünüm.
     var phase: WidgetPhase?
+    /// Temizlik 10 saniyeyi geçtiyse geçen süre sayacı bu andan sayar.
+    var elapsedFrom: Date?
+
+    func at(_ date: Date, phase: WidgetPhase?, elapsedFrom: Date? = nil) -> StatusEntry {
+        StatusEntry(date: date, status: status, preset: preset, custom: custom, phase: phase, elapsedFrom: elapsedFrom)
+    }
+
+    var isRunning: Bool { phase?.isRunning == true && (phase?.kind == .requested || phase?.kind == .cleaning) }
 
     var activeIDs: Set<String> { custom.map(Set.init) ?? preset }
     var presetBytes: Int64 { status.presetBytes(activeIDs) }
@@ -145,24 +153,42 @@ struct StatusEntry: TimelineEntry {
         )
     }
 
-    /// Sürüyorsa aşamayı gösterip kısa süre sonra yeniden sorar; sonuç varsa gösterip süresi bitince
-    /// olağan görünüme döner. Uygulama her aşama değişiminde ayrıca yeniletir.
+    /// Ölçüm: macOS zaman çizelgesi girişlerini ancak birkaç saniyede bir ilerletiyor; bu yüzden hareket
+    /// sistemin kendisinin akıcı çizdiği öğelerle yapılır (zamanlayıcı halkası ve süre sayacı), girişler
+    /// yalnızca aşama değişimleri için kullanılır: sürüyor → 10 sn sonra sayaçlı → sonuç → olağan görünüm.
     static func timeline(custom: [String]?) -> Timeline<StatusEntry> {
-        var base = current(custom: custom)
-        let normalRefresh = Date.now.addingTimeInterval(30 * 60)
+        let base = current(custom: custom)
+        let now = Date.now
+        let normalRefresh = now.addingTimeInterval(30 * 60)
         guard let phase = WidgetPhase.load() else { return Timeline(entries: [base], policy: .after(normalRefresh)) }
+        let started = phase.startedAt ?? phase.date
+
         if phase.isRunning {
-            base.phase = phase
-            return Timeline(entries: [base], policy: .after(.now.addingTimeInterval(15)))
+            let showElapsedAt = started.addingTimeInterval(RingTiming.showElapsedAfter)
+            if now >= showElapsedAt {
+                return Timeline(entries: [base.at(now, phase: phase, elapsedFrom: started)], policy: .after(now.addingTimeInterval(60)))
+            }
+            return Timeline(entries: [base.at(now, phase: phase), base.at(showElapsedAt, phase: phase, elapsedFrom: started)],
+                            policy: .after(now.addingTimeInterval(60)))
         }
-        if phase.isShowingResult {
-            var result = base
-            result.phase = phase
-            let after = StatusEntry(date: phase.resultEnds, status: base.status, preset: base.preset, custom: custom)
-            return Timeline(entries: [result, after], policy: .after(normalRefresh))
+
+        guard phase.kind == .done || phase.kind == .failed else {
+            return Timeline(entries: [base], policy: .after(normalRefresh))
         }
-        return Timeline(entries: [base], policy: .after(normalRefresh))
+        // Sonuç en az birkaç saniye görünsün (widget geç yenilenmiş olabilir).
+        let resultEnd = max(phase.date.addingTimeInterval(WidgetPhase.resultDuration), now.addingTimeInterval(4))
+        if now >= phase.date.addingTimeInterval(WidgetPhase.resultDuration + 30) {
+            return Timeline(entries: [base], policy: .after(normalRefresh))
+        }
+        return Timeline(entries: [base.at(now, phase: phase), base.at(resultEnd, phase: nil)], policy: .after(normalRefresh))
     }
+}
+
+enum RingTiming {
+    /// Halkanın bir kez dolma süresi; ilk 10 sn'de sayaç olmadan akıcı biçimde dolar.
+    static let showElapsedAfter: TimeInterval = 10
+    /// 10 sn'den sonra halka bu sürede yavaşça yeniden dolar (temizlik sürdükçe hareket devam etsin).
+    static let longCycle: TimeInterval = 50
 }
 
 /// Küçük/orta boy: sağ tıktaki yapılandırmayla.
@@ -206,21 +232,28 @@ private extension CleanConfigIntent {
 /// dinamik NSColor yerine renk şemasına göre seçilir.
 private struct Palette {
     let dark: Bool
+    /// Başka bir uygulama öndeyken macOS masaüstü widget'larını tek renkli (vibrant) çizer: renkler
+    /// parlaklığa göre saydamlığa çevrilir. Sarı zemin beyaza, koyu yazı görünmezliğe döner; bu modda
+    /// içerik beyaz tonlarla çizilir.
+    let monochrome: Bool
 
-    init(_ scheme: ColorScheme) { dark = scheme == .dark }
+    init(_ scheme: ColorScheme, _ mode: WidgetRenderingMode = .fullColor) {
+        dark = scheme == .dark
+        monochrome = mode != .fullColor
+    }
 
     var bg: Color { hex(dark ? 0x1F1D18 : 0xFFFBF0) }
-    var card: Color { hex(dark ? 0x2A2720 : 0xFFFFFF) }
-    var fg: Color { hex(dark ? 0xF5F0E1 : 0x2B2A28) }
-    var mute: Color { hex(dark ? 0x9E988A : 0x8A857A) }
-    var line: Color { hex(dark ? 0x38342B : 0xEFEAE0) }
-    var tint: Color { hex(dark ? 0x38342B : 0xFFF4C7) }
-    var acc: Color { hex(0xFFD230) }
-    var onAcc: Color { hex(0x2B2A28) }
-    var okSoft: Color { hex(dark ? 0x24402F : 0xCDEFE0) }
-    var onOk: Color { hex(dark ? 0x7CCFA8 : 0x1F6B4A) }
-    var warnSoft: Color { hex(dark ? 0x45291F : 0xFFE1DC) }
-    var onWarn: Color { hex(dark ? 0xF2877B : 0xA3402F) }
+    var card: Color { monochrome ? .white.opacity(0.08) : hex(dark ? 0x2A2720 : 0xFFFFFF) }
+    var fg: Color { monochrome ? .white : hex(dark ? 0xF5F0E1 : 0x2B2A28) }
+    var mute: Color { monochrome ? .white.opacity(0.6) : hex(dark ? 0x9E988A : 0x8A857A) }
+    var line: Color { monochrome ? .white.opacity(0.15) : hex(dark ? 0x38342B : 0xEFEAE0) }
+    var tint: Color { monochrome ? .white.opacity(0.12) : hex(dark ? 0x38342B : 0xFFF4C7) }
+    var acc: Color { monochrome ? .white.opacity(0.18) : hex(0xFFD230) }
+    var onAcc: Color { monochrome ? .white : hex(0x2B2A28) }
+    var okSoft: Color { monochrome ? .white.opacity(0.18) : hex(dark ? 0x24402F : 0xCDEFE0) }
+    var onOk: Color { monochrome ? .white : hex(dark ? 0x7CCFA8 : 0x1F6B4A) }
+    var warnSoft: Color { monochrome ? .white.opacity(0.18) : hex(dark ? 0x45291F : 0xFFE1DC) }
+    var onWarn: Color { monochrome ? .white : hex(dark ? 0xF2877B : 0xA3402F) }
 
     private func hex(_ value: Int) -> Color {
         Color(.sRGB, red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255)
@@ -248,69 +281,106 @@ struct QuickCleanWidgetView: View {
 
 private struct WidgetBackground: View {
     @Environment(\.colorScheme) private var scheme
-    var body: some View { Palette(scheme).bg }
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    var body: some View { Palette(scheme, renderingMode).bg }
 }
 
 /// Aşamaya göre büyük düğmenin içi: ✨ Temizle → dönen halka → ✓ sonuç.
 private struct PhaseTile: View {
     @Environment(\.colorScheme) private var scheme
-    let phase: WidgetPhase?
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    let entry: StatusEntry
     var iconSize: CGFloat = 36
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         ZStack {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(fill(p))
             Group {
-                switch phase?.kind {
-                case .requested?, .cleaning?:
+                if entry.isRunning, let phase = entry.phase {
                     VStack(spacing: 8) {
-                        // Zamanlayıcıya bağlı ilerleme halkası widget'ta kendiliğinden döner.
-                        ProgressView(timerInterval: phase!.date...phase!.date.addingTimeInterval(12), countsDown: false) { EmptyView() }
-                            .progressViewStyle(.circular)
-                            .tint(p.onAcc)
-                            .frame(width: iconSize + 6, height: iconSize + 6)
-                        Text(L("Temizleniyor…", "Cleaning…")).font(.system(size: 14, weight: .bold, design: .rounded))
+                        TimerRing(started: phase.startedAt ?? phase.date, elapsedFrom: entry.elapsedFrom, color: p.onAcc, size: iconSize + 8)
+                        ElapsedLabel(elapsedFrom: entry.elapsedFrom, font: .system(size: 14, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(p.onAcc)
-                case .done?:
-                    VStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill").font(.system(size: iconSize, weight: .semibold))
-                        if let freed = phase?.freedBytes {
-                            Text(bytes(freed))
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                .contentTransition(.numericText())
-                        } else {
-                            Text(L("Tamam", "Done")).font(.system(size: 17, weight: .bold, design: .rounded))
+                } else {
+                    switch entry.phase?.kind {
+                    case .done?:
+                        VStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill").font(.system(size: iconSize, weight: .semibold))
+                            if let freed = entry.phase?.freedBytes {
+                                Text(bytes(freed))
+                                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                                    .contentTransition(.numericText())
+                            } else {
+                                Text(L("Tamam", "Done")).font(.system(size: 17, weight: .bold, design: .rounded))
+                            }
                         }
+                        .foregroundStyle(p.onOk)
+                    case .failed?:
+                        VStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: iconSize - 6, weight: .semibold))
+                            Text(L("Tekrar dene", "Try again")).font(.system(size: 14, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(p.onWarn)
+                    default:
+                        VStack(spacing: 6) {
+                            Image(systemName: "sparkles").font(.system(size: iconSize, weight: .semibold))
+                            Text(L("Temizle", "Clean")).font(.system(size: 17, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(p.onAcc)
                     }
-                    .foregroundStyle(p.onOk)
-                case .failed?:
-                    VStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill").font(.system(size: iconSize - 6, weight: .semibold))
-                        Text(L("Tekrar dene", "Try again")).font(.system(size: 14, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(p.onWarn)
-                case nil:
-                    VStack(spacing: 6) {
-                        Image(systemName: "sparkles").font(.system(size: iconSize, weight: .semibold))
-                        Text(L("Temizle", "Clean")).font(.system(size: 17, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(p.onAcc)
                 }
             }
             .transition(.scale(scale: 0.6).combined(with: .opacity))
-            .id(phase?.kind)
+            .id(entry.isRunning ? "running" : (entry.phase?.kind.rawValue ?? "idle"))
         }
     }
 
     private func fill(_ p: Palette) -> Color {
-        switch phase?.kind {
-        case .done?: p.okSoft
-        case .failed?: p.warnSoft
-        default: p.acc
+        guard !entry.isRunning else { return p.acc }
+        switch entry.phase?.kind {
+        case .done?: return p.okSoft
+        case .failed?: return p.warnSoft
+        default: return p.acc
         }
+    }
+}
+
+/// Sayaçsız halka: sistemin zamanlayıcı halkası, widget'ın kendi animasyonundan bağımsız olarak akıcı dolar.
+/// İlk 10 sn'de bir kez dolar; temizlik sürüyorsa yavaşça yeniden dolmaya devam eder.
+private struct TimerRing: View {
+    let started: Date
+    let elapsedFrom: Date?
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        let range: ClosedRange<Date> = elapsedFrom == nil
+            ? started...started.addingTimeInterval(RingTiming.showElapsedAfter)
+            : started.addingTimeInterval(RingTiming.showElapsedAfter)...started.addingTimeInterval(RingTiming.showElapsedAfter + RingTiming.longCycle)
+        ProgressView(timerInterval: range, countsDown: false, label: { EmptyView() }, currentValueLabel: { EmptyView() })
+            .progressViewStyle(.circular)
+            .tint(color)
+            .frame(width: size, height: size)
+    }
+}
+
+/// Halkanın altındaki yazı: ilk 10 sn "Temizleniyor…", sonra canlı süre sayacı.
+private struct ElapsedLabel: View {
+    let elapsedFrom: Date?
+    let font: Font
+
+    var body: some View {
+        Group {
+            if let from = elapsedFrom {
+                Text(from, style: .timer).monospacedDigit()
+            } else {
+                Text(L("Temizleniyor…", "Cleaning…"))
+            }
+        }
+        .font(font)
     }
 }
 
@@ -322,7 +392,10 @@ private func phaseCaption(_ entry: StatusEntry) -> String {
             : L("\(entry.selectedCount) görev hazır", "\(entry.selectedCount) tasks ready")
     }
     switch phase.kind {
-    case .requested, .cleaning: return L("Arka planda temizleniyor", "Cleaning in the background")
+    case .requested, .cleaning:
+        return entry.elapsedFrom != nil
+            ? L("Devam ediyor…", "Still working…")
+            : L("Arka planda temizleniyor", "Cleaning in the background")
     case .done: return phase.freedBytes.map { L("\(bytes($0)) boşaltıldı", "\(bytes($0)) freed") } ?? (phase.message ?? L("Tamamlandı", "Done"))
     case .failed: return phase.message ?? L("Temizlik başarısız", "Cleanup failed")
     }
@@ -331,13 +404,14 @@ private func phaseCaption(_ entry: StatusEntry) -> String {
 /// Sade: tek büyük düğme, altında küçük kazanç notu. Uygulama penceresi açılmaz.
 private struct SmallView: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: StatusEntry
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         VStack(spacing: 8) {
             Button(intent: WidgetCleanIntent(.clean, taskIDs: entry.custom)) {
-                PhaseTile(phase: entry.phase)
+                PhaseTile(entry: entry)
             }
             .buttonStyle(.plain)
             .disabled(entry.phase?.isRunning == true)
@@ -353,13 +427,14 @@ private struct SmallView: View {
 
 private struct MediumView: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: StatusEntry
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         HStack(alignment: .top, spacing: 14) {
             Button(intent: WidgetCleanIntent(.clean, taskIDs: entry.custom)) {
-                PhaseTile(phase: entry.phase, iconSize: 30)
+                PhaseTile(entry: entry, iconSize: 30)
             }
             .buttonStyle(.plain)
             .disabled(entry.phase?.isRunning == true)
@@ -374,7 +449,7 @@ private struct MediumView: View {
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                     .contentTransition(.numericText())
-                Text(entry.phase?.kind == .done ? L("boşaltıldı", "freed") : L("temizlenebilir", "cleanable"))
+                Text(entry.phase?.freedBytes != nil ? L("boşaltıldı", "freed") : L("temizlenebilir", "cleanable"))
                     .font(.system(size: 11)).foregroundStyle(p.mute)
                 Spacer(minLength: 0)
                 Text(entry.phase == nil
@@ -396,12 +471,13 @@ private struct MediumView: View {
 /// Seçim kutularıyla ön ayarı düzenleyip seçilenleri temizler.
 private struct LargeView: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: StatusEntry
 
     private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 Header()
@@ -445,17 +521,19 @@ private struct LargeView: View {
 /// Büyük boydaki geniş düğme; aşamaya göre "Temizleniyor…" ya da "✓ X boşaltıldı" olur.
 private struct LargeCleanButton: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: StatusEntry
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         HStack(spacing: 8) {
+            if entry.isRunning, let phase = entry.phase {
+                TimerRing(started: phase.startedAt ?? phase.date, elapsedFrom: entry.elapsedFrom, color: p.onAcc, size: 16)
+                ElapsedLabel(elapsedFrom: entry.elapsedFrom, font: .system(size: 13, weight: .semibold, design: .rounded))
+            } else {
             switch entry.phase?.kind {
             case .requested?, .cleaning?:
-                ProgressView(timerInterval: entry.phase!.date...entry.phase!.date.addingTimeInterval(12), countsDown: false) { EmptyView() }
-                    .progressViewStyle(.circular)
-                    .tint(p.onAcc)
-                    .frame(width: 16, height: 16)
+                Image(systemName: "sparkles")
                 Text(L("Temizleniyor…", "Cleaning…"))
             case .done?:
                 Image(systemName: "checkmark.circle.fill")
@@ -469,6 +547,7 @@ private struct LargeCleanButton: View {
                      ? L("Seçilenleri Temizle · \(bytes(entry.presetBytes))", "Clean Selected · \(bytes(entry.presetBytes))")
                      : L("Seçilenleri Temizle", "Clean Selected"))
             }
+            }
         }
         .font(.system(size: 13, weight: .semibold, design: .rounded))
         .lineLimit(1)
@@ -478,33 +557,36 @@ private struct LargeCleanButton: View {
         .background(background(p), in: Capsule())
         .foregroundStyle(foreground(p))
         .transition(.opacity)
-        .id(entry.phase?.kind)
+        .id(entry.isRunning ? "running" : (entry.phase?.kind.rawValue ?? "idle"))
     }
 
     private func background(_ p: Palette) -> Color {
+        guard !entry.isRunning else { return p.acc }
         switch entry.phase?.kind {
-        case .done?: p.okSoft
-        case .failed?: p.warnSoft
-        default: p.acc
+        case .done?: return p.okSoft
+        case .failed?: return p.warnSoft
+        default: return p.acc
         }
     }
 
     private func foreground(_ p: Palette) -> Color {
+        guard !entry.isRunning else { return p.onAcc }
         switch entry.phase?.kind {
-        case .done?: p.onOk
-        case .failed?: p.onWarn
-        default: p.onAcc
+        case .done?: return p.onOk
+        case .failed?: return p.onWarn
+        default: return p.onAcc
         }
     }
 }
 
 private struct TaskToggle: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let task: WidgetStatus.TaskInfo
     let isOn: Bool
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         Toggle(isOn: isOn, intent: ToggleTaskIntent(taskID: task.id)) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(task.title)
@@ -558,9 +640,10 @@ private struct CheckToggleStyle: ToggleStyle {
 
 private struct Header: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         HStack(spacing: 6) {
             Image(systemName: "sparkles")
                 .font(.system(size: 10, weight: .bold))
@@ -576,10 +659,11 @@ private struct Header: View {
 
 private struct LastClean: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let status: WidgetStatus
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         if let date = status.lastCleanDate {
             VStack(alignment: .leading, spacing: 1) {
                 Text(L("Son temizlik", "Last cleanup")).font(.system(size: 10)).foregroundStyle(p.mute)
@@ -601,13 +685,14 @@ private struct LastClean: View {
 
 private struct Pill: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let title: String
     let systemImage: String
     let primary: Bool
     var large = false
 
     var body: some View {
-        let p = Palette(scheme)
+        let p = Palette(scheme, renderingMode)
         Label(title, systemImage: systemImage)
             .font(.system(size: large ? 13 : 12, weight: .semibold, design: .rounded))
             .lineLimit(1)
