@@ -30,7 +30,7 @@ struct WidgetStatus: Codable, Sendable {
         let icon: String
         /// Taranabilen görevler için temizlenebilir boyut; komut görevlerinde `nil`.
         let bytes: Int64?
-        let requiresAdmin: Bool
+        let needsPassword: Bool
     }
 
     var tasks: [TaskInfo] = []

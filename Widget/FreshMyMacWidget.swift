@@ -50,10 +50,10 @@ struct StatusEntry: TimelineEntry {
         return StatusEntry(
             date: .now,
             status: WidgetStatus(tasks: [
-                .init(id: "user-caches", title: L("Uygulama Önbelleği", "App Cache"), icon: "archivebox", bytes: 2_400_000_000, requiresAdmin: false),
-                .init(id: "user-logs", title: L("Günlükler", "Logs"), icon: "doc.text", bytes: 300_000_000, requiresAdmin: false),
-                .init(id: "browser-caches", title: L("Tarayıcı Önbelleği", "Browser Cache"), icon: "globe", bytes: 900_000_000, requiresAdmin: false),
-                .init(id: "dns-flush", title: L("İnternet Önbelleği", "Internet Cache"), icon: "network", bytes: nil, requiresAdmin: true),
+                .init(id: "user-caches", title: L("Uygulama Önbelleği", "App Cache"), icon: "archivebox", bytes: 2_400_000_000, needsPassword: false),
+                .init(id: "user-logs", title: L("Günlükler", "Logs"), icon: "doc.text", bytes: 300_000_000, needsPassword: false),
+                .init(id: "browser-caches", title: L("Tarayıcı Önbelleği", "Browser Cache"), icon: "globe", bytes: 900_000_000, needsPassword: false),
+                .init(id: "dns-flush", title: L("İnternet Önbelleği", "Internet Cache"), icon: "network", bytes: nil, needsPassword: true),
             ]),
             preset: PresetStore.defaultIDs
         )
@@ -233,7 +233,7 @@ private struct LargeView: View {
             HStack {
                 LastClean(status: entry.status)
                 Spacer()
-                if entry.status.tasks.contains(where: { $0.requiresAdmin && entry.preset.contains($0.id) }) {
+                if entry.status.tasks.contains(where: { $0.needsPassword && entry.preset.contains($0.id) }) {
                     Label(L("Şifre istenebilir", "May ask for password"), systemImage: "lock.fill")
                         .font(.system(size: 10)).foregroundStyle(p.mute)
                 }
@@ -259,7 +259,7 @@ private struct TaskToggle: View {
                 Group {
                     if let size = task.bytes, size > 0 {
                         Text(bytes(size))
-                    } else if task.requiresAdmin {
+                    } else if task.needsPassword {
                         Text(L("şifre ister", "needs password"))
                     } else {
                         Text(" ")

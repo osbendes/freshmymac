@@ -29,20 +29,36 @@ enum Shell {
             process.environment = ProcessInfo.processInfo.environment.merging(["PATH": path]) { _, new in new }
             process.standardOutput = pipe
             process.standardError = pipe
+
+            // İki olay beklenir: süreç bitti ve çıktı sonuna kadar okundu. `waitUntilExit()` arka plan
+            // iş parçacığında, çok hızlı biten süreçlerde bitiş bildirimini kaçırıp sonsuza dek bekleyebiliyor;
+            // bu yüzden bitiş `terminationHandler` ile alınır. Çıktı süreç çalışırken okunur, yoksa dolan
+            // pipe tamponu süreci kilitler.
+            let group = DispatchGroup()
+            let output = OutputBuffer()
+            group.enter()
+            group.enter()
+            process.terminationHandler = { _ in group.leave() }
             do {
                 try process.run()
             } catch {
                 continuation.resume(returning: Output(status: -1, output: error.localizedDescription))
                 return
             }
-            // Çıktıyı süreç çalışırken oku; aksi halde dolan pipe tamponu süreci kilitler.
             DispatchQueue.global(qos: .userInitiated).async {
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                let text = String(decoding: data, as: UTF8.self)
-                continuation.resume(returning: Output(status: process.terminationStatus, output: text))
+                output.data = pipe.fileHandleForReading.readDataToEndOfFile()
+                group.leave()
+            }
+            group.notify(queue: .global(qos: .userInitiated)) {
+                continuation.resume(returning: Output(status: process.terminationStatus,
+                                                      output: String(decoding: output.data, as: UTF8.self)))
             }
         }
+    }
+
+    /// Okuma kuyruğundan tamamlanma bloğuna çıktıyı taşır; erişimler DispatchGroup ile sıralanır.
+    private final class OutputBuffer: @unchecked Sendable {
+        var data = Data()
     }
 
     /// Komutları macOS'un standart yönetici şifresi penceresiyle çalıştırır.

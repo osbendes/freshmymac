@@ -15,7 +15,7 @@ struct TaskRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(task.title).font(.system(size: 14, weight: .medium))
-                    if task.requiresAdmin {
+                    if task.needsPassword {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.mute)

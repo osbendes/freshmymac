@@ -32,7 +32,7 @@ enum CleanupEngine {
             let existing = urls.filter(FileUtils.exists)
             return .measured(bytes: existing.reduce(0) { $0 + FileUtils.allocatedSize(of: $1) }, items: existing.count)
 
-        case .shell, .adminShell:
+        case .shell, .privileged:
             return .notMeasurable
         }
     }
@@ -50,19 +50,17 @@ enum CleanupEngine {
             return delete(resolve().filter(FileUtils.exists))
         case let .shell(command):
             return result(from: await Shell.run(command))
-        case let .adminShell(command):
-            return result(from: await Shell.runAsAdmin(command))
+        case let .privileged(commands):
+            return await PrivilegedAccess.run(commands)
         }
     }
 
-    /// Yönetici gerektiren görevleri tek şifre istemiyle birlikte çalıştırır.
-    static func cleanAdminBatch(_ tasks: [CleanupTask]) async -> CleanupResult {
-        let commands = tasks.compactMap { task -> String? in
-            if case let .adminShell(cmd) = task.action { return "(\(cmd))" }
-            return nil
-        }
-        guard !commands.isEmpty else { return CleanupResult() }
-        return result(from: await Shell.runAsAdmin(commands.joined(separator: "; ")))
+    /// Yetkili görevleri birlikte çalıştırır: izin yoksa şifre yalnızca bir kez sorulur.
+    static func cleanPrivileged(_ tasks: [CleanupTask]) async -> CleanupResult {
+        await PrivilegedAccess.run(tasks.flatMap { task -> [PrivilegedCommand] in
+            if case let .privileged(commands) = task.action { return commands }
+            return []
+        })
     }
 
     // MARK: Yardımcılar

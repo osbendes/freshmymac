@@ -33,12 +33,15 @@ struct ContentView: View {
     /// Açılış ekranı `-screen cleanup` gibi bir başlatma argümanıyla seçilebilir (ekran görüntüleri için).
     @State private var screen = Screen(rawValue: UserDefaults.standard.string(forKey: "screen") ?? "") ?? .overview
 
+    @State private var showOnboarding = false
+
     var body: some View {
         // Metinler `L(...)` ile çözüldüğü için dil değişince alt görünümler yeniden kurulur;
         // `screen` burada tutulduğundan açık ekran korunur.
-        let language = state.settings.language
+        // Dil ya da yönetici izni değişince (kilit simgeleri) alt görünümler yeniden kurulur.
+        let refreshKey = "\(state.settings.language.rawValue)-\(state.privilegesGranted)"
         HStack(spacing: 0) {
-            Sidebar(screen: $screen).id(language)
+            Sidebar(screen: $screen).id(refreshKey)
             Rectangle().fill(Theme.line).frame(width: 1)
             Group {
                 switch screen {
@@ -50,11 +53,20 @@ struct ContentView: View {
                 case .settings: SettingsView()
                 }
             }
-            .id(language)
+            .id(refreshKey)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.content)
         }
         .environment(\.locale, L10n.locale)
+        .sheet(isPresented: $showOnboarding) { OnboardingView().environment(state) }
+        .onChange(of: state.privilegesChecked) { _, checked in
+            // İlk açılışta, izin verilmemişse bir kez gösterilir (ekran görüntüsü modunda hiç).
+            let snapshotting = UserDefaults.standard.string(forKey: "snapshot") != nil || Demo.isOn
+            if checked, !state.privilegesGranted, !snapshotting,
+               !UserDefaults.standard.bool(forKey: OnboardingView.doneKey) {
+                showOnboarding = true
+            }
+        }
         .ignoresSafeArea(.container, edges: .top)
         .foregroundStyle(Theme.fg)
     }

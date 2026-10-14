@@ -155,8 +155,47 @@ final class AppState {
         guard !started else { return }
         started = true
         refreshDisk()
+        Task { await refreshPrivileges() }
         Task { await cleaner.scan() }
         Task { await schedulerLoop() }
+    }
+
+    // MARK: İzinler
+
+    /// Yetkili görevler (internet önbelleği, bellek) şifresiz çalışabiliyor mu?
+    var privilegesGranted = false
+    /// İlk kontrol bitti mi? (Karşılama penceresi sonuç belli olmadan açılmasın.)
+    var privilegesChecked = false
+    var isChangingPrivileges = false
+    var privilegeError: String?
+
+    /// Tam Disk Erişimi: Çöp Kutusu okunabiliyorsa verilmiştir.
+    var hasFullDiskAccess: Bool {
+        FileUtils.contents(of: FileUtils.home.appending(path: ".Trash")) != nil
+    }
+
+    func refreshPrivileges() async {
+        privilegesGranted = await PrivilegedAccess.refresh()
+        privilegesChecked = true
+        publishWidgetStatus()
+    }
+
+    /// Yönetici şifresini bir kez sorup kalıcı izni kurar.
+    func grantPrivileges() async {
+        await changePrivileges { await PrivilegedAccess.install() }
+    }
+
+    func revokePrivileges() async {
+        await changePrivileges { await PrivilegedAccess.uninstall() }
+    }
+
+    private func changePrivileges(_ change: () async -> CleanupResult) async {
+        isChangingPrivileges = true
+        defer { isChangingPrivileges = false }
+        let result = await change()
+        privilegeError = result.succeeded ? nil : result.message
+        privilegesGranted = PrivilegedAccess.isGranted
+        publishWidgetStatus()
     }
 
     func refreshDisk() {
@@ -171,10 +210,10 @@ final class AppState {
 
     var presetBytes: Int64 { cleaner.bytes(of: presetTasks) }
 
-    /// Ön ayardaki görevleri çalıştırır. `includeAdmin: false` şifre gerektirenleri atlar.
+    /// Ön ayardaki görevleri çalıştırır. `allowPasswordPrompt: false` şifre gerektirecekleri atlar.
     @discardableResult
-    func quickClean(includeAdmin: Bool = true) async -> Int64 {
-        let freed = await cleaner.clean(presetTasks, includeAdmin: includeAdmin)
+    func quickClean(allowPasswordPrompt: Bool = true) async -> Int64 {
+        let freed = await cleaner.clean(presetTasks, allowPasswordPrompt: allowPasswordPrompt)
         settings.lastQuickClean = .now
         settings.lastQuickFreed = freed
         refreshDisk()
@@ -204,7 +243,7 @@ final class AppState {
                 title: task.shortTitle,
                 icon: task.icon,
                 bytes: bytes,
-                requiresAdmin: task.requiresAdmin
+                needsPassword: task.needsPassword
             )
         }
         WidgetStatus(
@@ -252,7 +291,7 @@ final class AppState {
     func runAutoCleanIfDue() async {
         guard settings.autoCleanEnabled, !cleaner.isBusy,
               let next = settings.nextAutoClean, next <= .now else { return }
-        let freed = await quickClean(includeAdmin: false)
+        let freed = await quickClean(allowPasswordPrompt: false)
         settings.lastAutoClean = .now
         await Notifier.post(title: "FreshMyMac", body: L("Otomatik temizlik tamamlandı: \(Format.bytes(freed)) boşaltıldı.", "Automatic cleanup finished: \(Format.bytes(freed)) freed."))
     }

@@ -31,8 +31,9 @@ enum CleanupAction: Sendable {
     case deleteItems(@Sendable () -> [URL])
     /// Normal kullanıcı yetkisiyle kabuk komutu çalıştırır.
     case shell(String)
-    /// Yönetici yetkisiyle kabuk komutu çalıştırır (şifre istenir).
-    case adminShell(String)
+    /// Root yetkisiyle sabit komutlar çalıştırır. `PrivilegedAccess` izni verilmişse şifresiz,
+    /// verilmemişse tek bir yönetici şifresi istemiyle.
+    case privileged([PrivilegedCommand])
 }
 
 /// Tek bir temizlik görevi. Yeni görevler `TaskCatalog` içine eklenir.
@@ -80,16 +81,19 @@ struct CleanupTask: Identifiable, Sendable {
     var subtitle: String { subtitleText.value }
     var shortTitle: String { (shortTitleText ?? titleText).value }
 
-    var requiresAdmin: Bool {
-        if case .adminShell = action { return true }
+    var isPrivileged: Bool {
+        if case .privileged = action { return true }
         return false
     }
+
+    /// Çalışırken yönetici şifresi sorulacak mı? (Yetkili ama tek seferlik izin verilmemiş.)
+    var needsPassword: Bool { isPrivileged && !PrivilegedAccess.isGranted }
 
     /// Boyutu ölçülebilen bir görev mi?
     var isMeasurable: Bool {
         switch action {
         case .deleteContents, .deleteItems: true
-        case .shell, .adminShell: false
+        case .shell, .privileged: false
         }
     }
 }

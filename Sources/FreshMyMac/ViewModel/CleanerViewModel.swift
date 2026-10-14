@@ -71,9 +71,10 @@ final class CleanerViewModel {
     func task(id: String) -> CleanupTask? { tasks.first { $0.id == id } }
 
     /// Görevleri (varsayılan: seçili olanlar) çalıştırır ve boşaltılan alanı döndürür.
-    /// `includeAdmin: false` zamanlanmış temizlikte şifre penceresi açılmasını önler.
+    /// `allowPasswordPrompt: false` (zamanlanmış temizlik) şifre gerektirecek görevleri atlar;
+    /// tek seferlik izin verildiyse yetkili görevler şifresiz çalıştığı için atlanmaz.
     @discardableResult
-    func clean(_ tasks: [CleanupTask]? = nil, includeAdmin: Bool = true) async -> Int64 {
+    func clean(_ tasks: [CleanupTask]? = nil, allowPasswordPrompt: Bool = true) async -> Int64 {
         guard !isCleaning else { return 0 }
         isCleaning = true
         defer { isCleaning = false }
@@ -81,7 +82,7 @@ final class CleanerViewModel {
         var freed: Int64 = 0
 
         let toRun = tasks ?? selectedTasks
-        for task in toRun where !task.requiresAdmin {
+        for task in toRun where !task.isPrivileged {
             if let blocker = runningBlocker(for: task) {
                 log.append(LogEntry(title: task.title, detail: L("\(blocker) açık olduğu için atlandı. Kapatıp tekrar deneyin.", "Skipped because \(blocker) is open. Quit it and try again."), success: false))
                 continue
@@ -91,10 +92,10 @@ final class CleanerViewModel {
             append(task.title, result)
         }
 
-        let adminTasks = toRun.filter(\.requiresAdmin)
-        if includeAdmin && !adminTasks.isEmpty {
-            let result = await CleanupEngine.cleanAdminBatch(adminTasks)
-            append(adminTasks.map(\.title).joined(separator: ", "), result)
+        let privileged = toRun.filter(\.isPrivileged)
+        if !privileged.isEmpty && (allowPasswordPrompt || PrivilegedAccess.isGranted) {
+            let result = await CleanupEngine.cleanPrivileged(privileged)
+            append(privileged.map(\.title).joined(separator: ", "), result)
         }
 
         lastFreedBytes = freed

@@ -95,7 +95,11 @@ enum TaskCatalog {
             subtitle: LText("DNS ve ARP önbelleğini sıfırlar; Windows'taki ipconfig /flushdns karşılığı", "Resets the DNS and ARP caches, like ipconfig /flushdns on Windows"),
             icon: "network",
             category: .privacy,
-            action: .adminShell("dscacheutil -flushcache; killall -HUP mDNSResponder; arp -a -d >/dev/null 2>&1; true")
+            action: .privileged([
+                PrivilegedCommand(path: "/usr/bin/dscacheutil", arguments: ["-flushcache"]),
+                PrivilegedCommand(path: "/usr/bin/killall", arguments: ["-HUP", "mDNSResponder"]),
+                PrivilegedCommand(path: "/usr/sbin/arp", arguments: ["-a", "-d"], ignoresFailure: true),
+            ])
         ),
         CleanupTask(
             id: "quicklook",
@@ -115,7 +119,7 @@ enum TaskCatalog {
             subtitle: LText("Etkin olmayan RAM'i serbest bırakır (purge)", "Releases inactive RAM (purge)"),
             icon: "memorychip",
             category: .performance,
-            action: .adminShell("purge"),
+            action: .privileged([PrivilegedCommand(path: "/usr/sbin/purge", arguments: [])]),
             selectedByDefault: false
         ),
 

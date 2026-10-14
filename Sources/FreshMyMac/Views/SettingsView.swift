@@ -88,7 +88,7 @@ struct SettingsView: View {
                                 Toggle(isOn: .membership(task.id, in: $settings.presetTaskIDs)) {
                                     HStack(spacing: 6) {
                                         Text(task.title)
-                                        if task.requiresAdmin {
+                                        if task.needsPassword {
                                             Image(systemName: "lock.fill").font(.system(size: 10)).foregroundStyle(Theme.mute)
                                         }
                                     }
@@ -151,19 +151,15 @@ struct SettingsView: View {
     }
 
     private var permissionsCard: some View {
-        HStack(spacing: 12) {
-            Plate(icon: "lock.shield", color: Theme.lavender)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(L("Tam Disk Erişimi", "Full Disk Access")).font(.system(size: 13, weight: .medium))
-                Text(L("Çöp Kutusu, Safari geçmişi ve bazı kapsayıcılar için gereklidir.", "Required for the Trash, Safari history and some containers."))
-                    .font(.system(size: 12)).foregroundStyle(Theme.mute)
-            }
-            Spacer()
-            Button(L("Ayarları Aç", "Open Settings")) { SystemSettings.openFullDiskAccess() }
-                .buttonStyle(.pill)
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(L("İzinler", "Permissions"))
+            AdminPermissionRow()
+            RowDivider()
+            FullDiskAccessRow()
         }
         .card(padding: 18)
     }
+
 }
 
 /// Seçili seçeneği sarı kapsülle gösteren bölümlü seçici.
