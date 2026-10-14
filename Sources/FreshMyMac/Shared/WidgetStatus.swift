@@ -40,8 +40,6 @@ struct WidgetStatus: Codable, Sendable {
     var lastFreedBytes: Int64?
 
     static let urlScheme = "freshmymac"
-    static let cleanURL = URL(string: "\(urlScheme)://clean")!
-    static let flushDNSURL = URL(string: "\(urlScheme)://flushdns")!
 
     private static let fileName = "widget-status.json"
 
@@ -74,5 +72,72 @@ enum PresetStore {
         var ids = load() ?? defaultIDs
         if ids.contains(id) { ids.remove(id) } else { ids.insert(id) }
         save(ids)
+    }
+}
+
+/// Widget'tan uygulamaya giden temizlik isteği. `freshmymac://clean?tasks=a,b&background=1` biçiminde
+/// iletilir; `background` uygulamanın pencere açmadan ve öne gelmeden çalışmasını ister.
+struct WidgetRequest: Sendable, Equatable {
+    enum Action: String, Sendable { case clean, flushdns }
+
+    var action: Action
+    /// Widget'a özel görevler; `nil` ise uygulamadaki Tek Tık ön ayarı kullanılır.
+    var taskIDs: [String]?
+    var background = true
+
+    var url: URL {
+        var components = URLComponents()
+        components.scheme = WidgetStatus.urlScheme
+        components.host = action.rawValue
+        var items: [URLQueryItem] = []
+        if let taskIDs { items.append(URLQueryItem(name: "tasks", value: taskIDs.joined(separator: ","))) }
+        if background { items.append(URLQueryItem(name: "background", value: "1")) }
+        components.queryItems = items.isEmpty ? nil : items
+        return components.url!
+    }
+
+    init(action: Action, taskIDs: [String]? = nil, background: Bool = true) {
+        self.action = action
+        self.taskIDs = taskIDs
+        self.background = background
+    }
+
+    init?(url: URL) {
+        guard url.scheme == WidgetStatus.urlScheme, let action = Action(rawValue: url.host() ?? "") else { return nil }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        self.action = action
+        self.taskIDs = items.first { $0.name == "tasks" }?.value.map { $0.split(separator: ",").map(String.init) }
+        self.background = items.contains { $0.name == "background" && $0.value == "1" }
+    }
+}
+
+/// Widget'ın gösterdiği temizlik aşaması. İsteği widget, ilerleyişi ve sonucu uygulama yazar;
+/// widget bu dosyaya göre "temizleniyor" animasyonunu ve sonucu çizer.
+struct WidgetPhase: Codable, Sendable, Equatable {
+    enum Kind: String, Codable, Sendable { case requested, cleaning, done, failed }
+
+    var kind: Kind
+    var date: Date = .now
+    var freedBytes: Int64?
+    var message: String?
+
+    /// Sonuç bu süre boyunca gösterilir, ardından widget olağan görünümüne döner.
+    static let resultDuration: TimeInterval = 8
+    /// İstek bu sürede yanıtlanmazsa (uygulama açılamadıysa) bayat sayılır.
+    static let staleAfter: TimeInterval = 90
+
+    private static let fileName = "widget-phase.json"
+
+    static func load() -> WidgetPhase? { SharedStore.read(WidgetPhase.self, from: fileName) }
+    func save() { SharedStore.write(self, to: Self.fileName) }
+
+    var isRunning: Bool {
+        (kind == .requested || kind == .cleaning) && Date.now.timeIntervalSince(date) < Self.staleAfter
+    }
+
+    var resultEnds: Date { date.addingTimeInterval(Self.resultDuration) }
+
+    var isShowingResult: Bool {
+        (kind == .done || kind == .failed) && Date.now < resultEnds
     }
 }

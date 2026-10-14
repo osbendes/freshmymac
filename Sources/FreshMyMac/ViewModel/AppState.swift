@@ -139,6 +139,7 @@ final class AppState {
 
     /// Ana pencereyi açar ya da öne getirir. Pencere kapatılmışsa SwiftUI onu yeniden oluşturur.
     func showMainWindow() {
+        backgroundSession = false
         if let openMainWindow {
             openMainWindow()
         } else if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
@@ -210,10 +211,10 @@ final class AppState {
 
     var presetBytes: Int64 { cleaner.bytes(of: presetTasks) }
 
-    /// Ön ayardaki görevleri çalıştırır. `allowPasswordPrompt: false` şifre gerektirecekleri atlar.
+    /// Ön ayardaki (ya da verilen) görevleri çalıştırır. `allowPasswordPrompt: false` şifre gerektirecekleri atlar.
     @discardableResult
-    func quickClean(allowPasswordPrompt: Bool = true) async -> Int64 {
-        let freed = await cleaner.clean(presetTasks, allowPasswordPrompt: allowPasswordPrompt)
+    func quickClean(_ tasks: [CleanupTask]? = nil, allowPasswordPrompt: Bool = true) async -> Int64 {
+        let freed = await cleaner.clean(tasks ?? presetTasks, allowPasswordPrompt: allowPasswordPrompt)
         settings.lastQuickClean = .now
         settings.lastQuickFreed = freed
         refreshDisk()
@@ -260,24 +261,65 @@ final class AppState {
         guard url.scheme == WidgetStatus.urlScheme else { return }
         start()
         settings.reloadPreset()
-        switch url.host() {
-        case "clean":
-            Task {
-                let freed = await quickClean()
-                await Notifier.post(
-                    title: L("Tek Tık Temizlik tamamlandı", "One-Click Clean finished"),
-                    body: L("\(Format.bytes(freed)) boşaltıldı.", "\(Format.bytes(freed)) freed.")
-                )
-            }
-        case "flushdns":
-            Task {
-                await flushInternetCache()
-                await Notifier.post(title: "FreshMyMac", body: lastActionMessage ?? "")
-            }
-        default:
+        guard let request = WidgetRequest(url: url) else {
             showMainWindow()
+            return
+        }
+        // Açılış penceresi daha gösterilmeden gelen arka plan isteği: uygulama widget için başlatıldı.
+        if request.background && launchedRecently && !NSApp.isActive {
+            backgroundSession = true
+        }
+        pendingWidgetRequests += 1
+        Task {
+            await run(request)
+            pendingWidgetRequests -= 1
+            // Menü çubuğu simgesi kapalıyken uygulamayı yalnızca bu istek için açtıysak işi bitince kapat.
+            if pendingWidgetRequests == 0, !settings.showMenuBarIcon,
+               !NSApp.windows.contains(where: { $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }) {
+                NSApp.terminate(nil)
+            }
         }
     }
+
+    private let launchDate = Date.now
+    private var launchedRecently: Bool { Date.now.timeIntervalSince(launchDate) < 3 }
+
+    /// Süren widget istekleri; bunlar bitmeden uygulama son pencere kapandı diye kapanmaz.
+    var pendingWidgetRequests = 0
+
+    /// Widget'tan gelen isteği pencere açmadan çalıştırır; ilerleyişi ve sonucu widget'a yazar.
+    private func run(_ request: WidgetRequest) async {
+        // Başka bir temizlik sürüyorsa bitmesini bekle; istek kaybolmasın.
+        while cleaner.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
+        updateWidgetPhase(WidgetPhase(kind: .cleaning))
+
+        let phase: WidgetPhase
+        switch request.action {
+        case .clean:
+            let tasks = request.taskIDs.map { ids in cleaner.tasks.filter { ids.contains($0.id) } }
+            let freed = await quickClean(tasks)
+            let failure = cleaner.log.first { !$0.success }
+            phase = WidgetPhase(kind: .done, freedBytes: freed, message: failure.map { "\($0.title): \($0.detail)" })
+        case .flushdns:
+            await flushInternetCache()
+            let success = cleaner.log.last?.success ?? false
+            phase = WidgetPhase(kind: success ? .done : .failed, message: lastActionMessage)
+        }
+        updateWidgetPhase(phase)
+        if !request.background {
+            await Notifier.post(title: "FreshMyMac", body: lastActionMessage ?? "")
+        }
+    }
+
+    private func updateWidgetPhase(_ phase: WidgetPhase) {
+        phase.save()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Açılış penceresi henüz gösterilmedi (bkz. `LaunchWindowGate`).
+    var launchGatePending = true
+    /// Bu oturum widget'ın arka plan isteğiyle (pencere olmadan) başladı.
+    var backgroundSession = false
 
     // MARK: Zamanlanmış temizlik
 

@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 # Kendi kimliğinizle derlemek için: BUNDLE_ID=com.ornek.FreshMyMac ./scripts/build-app.sh
 BUNDLE_ID="${BUNDLE_ID:-com.osbendes.FreshMyMac}"
-VERSION="${VERSION:-0.2.0}"
+VERSION="${VERSION:-0.2.1}"
 MODE="${1:-}"
 if [[ $MODE == --release ]]; then
     ARCHS=(arm64 x86_64)
@@ -76,7 +76,7 @@ $PLATFORM_KEYS
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
-    <key>CFBundleVersion</key><string>2</string>
+    <key>CFBundleVersion</key><string>3</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>CFBundleURLTypes</key>
@@ -97,7 +97,7 @@ PLIST
 INTERMEDIATE="build/intermediates/widget"
 mkdir -p "$INTERMEDIATE" "$WIDGET/Contents/Resources"
 WIDGET_SOURCES=(Widget/*.swift Sources/FreshMyMac/Shared/*.swift)
-printf '%s\n' '["AppIntent","AppEntity","AppEnum","TransientEntity","EntityQuery","DynamicOptionsProvider","AppShortcutsProvider","AppIntentsPackage","_IntentValueRepresentable","AnyResolverProviding","_AssistantIntentsProvider"]' > "$INTERMEDIATE/protocols.json"
+printf '%s\n' '["AppIntent","WidgetConfigurationIntent","AppEntity","AppEnum","TransientEntity","EntityQuery","DynamicOptionsProvider","AppShortcutsProvider","AppIntentsPackage","_IntentValueRepresentable","AnyResolverProviding","_AssistantIntentsProvider"]' > "$INTERMEDIATE/protocols.json"
 
 # Her mimari ayrı derlenip lipo ile tek dosyada birleştirilir.
 SLICES=()
@@ -112,6 +112,8 @@ for arch in "${ARCHS[@]}"; do
     SLICES+=("$INTERMEDIATE/FreshMyMacWidget-$arch")
 done
 lipo -create "${SLICES[@]}" -output "$WIDGET/Contents/MacOS/FreshMyMacWidget"
+# Sağ tık › "Widget'ı Düzenle" penceresindeki başlıkların çevirileri (anahtarlar İngilizce).
+cp -R Widget/Resources/*.lproj "$WIDGET/Contents/Resources/"
 
 # Widget'taki seçim kutuları (AppIntent) için Xcode'un ürettiği Metadata.appintents paketi.
 printf '%s\n' "${WIDGET_SOURCES[@]:A}" > "$INTERMEDIATE/sources.txt"
@@ -144,7 +146,7 @@ $PLATFORM_KEYS
     <key>CFBundleExecutable</key><string>FreshMyMacWidget</string>
     <key>CFBundlePackageType</key><string>XPC!</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
-    <key>CFBundleVersion</key><string>2</string>
+    <key>CFBundleVersion</key><string>3</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSExtension</key>
     <dict>

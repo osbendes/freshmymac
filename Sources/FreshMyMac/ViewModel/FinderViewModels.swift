@@ -12,9 +12,26 @@ final class LargeFilesViewModel {
     var olderThanDays = 30
 
     var results: [FoundFile] = [] {
-        didSet { grouped = Dictionary(grouping: results) { FileKind(url: $0.url) } }
+        didSet { regroup() }
     }
     private(set) var grouped: [FileKind: [FoundFile]] = [:]
+    /// `sort` sırasıyla tüm sonuçlar ("Tümü" görünümü).
+    private(set) var sortedResults: [FoundFile] = []
+
+    var grouping: LargeFileGrouping = LargeFileGrouping(rawValue: UserDefaults.standard.string(forKey: "largeFilesGrouping") ?? "") ?? .all {
+        didSet { UserDefaults.standard.set(grouping.rawValue, forKey: "largeFilesGrouping") }
+    }
+    var sort: LargeFileSort = LargeFileSort(rawValue: UserDefaults.standard.string(forKey: "largeFilesSort") ?? "") ?? .size {
+        didSet {
+            UserDefaults.standard.set(sort.rawValue, forKey: "largeFilesSort")
+            regroup()
+        }
+    }
+
+    private func regroup() {
+        sortedResults = sort.sorted(results)
+        grouped = Dictionary(grouping: sortedResults) { FileKind(url: $0.url) }
+    }
     var selection: Set<URL> = []
     var isScanning = false
     var hasScanned = false

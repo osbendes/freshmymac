@@ -10,6 +10,7 @@ struct FreshMyMacApp: App {
         Window("FreshMyMac", id: "main") {
             ContentView()
                 .background(OpenWindowCapture())
+                .background(LaunchWindowGate())
                 .environment(state)
                 .tint(Theme.acc)
                 .fontDesign(.rounded)
@@ -66,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Menü çubuğu simgesi açıksa pencere kapansa da uygulama (ve zamanlayıcı) çalışmaya devam eder.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         AppSettings.registerDefaults()
+        // Arka planda başlatıldıysa ya da widget isteği sürüyorsa kapanma; istek bitince AppState kapatır.
+        if AppState.shared.backgroundSession || AppState.shared.pendingWidgetRequests > 0 { return false }
         return !UserDefaults.standard.bool(forKey: AppSettings.Keys.showMenuBarIcon)
     }
 }
@@ -80,4 +83,29 @@ private struct OpenWindowCapture: View {
             AppState.shared.openMainWindow = { openWindow(id: "main") }
         }
     }
+}
+
+/// SwiftUI `Window` sahnesi açılışta pencereyi her zaman oluşturur; widget'ın arka plan isteğini taşıyan
+/// URL olayı ise ancak pencere oluştuktan sonra gelir. Bu yüzden açılış penceresi kısa bir süre saydam
+/// tutulur: bu sürede arka plan isteği gelirse pencere hiç görünmeden kapanır, gelmezse belirir.
+/// Uygulama menü çubuğunda çalışmaya devam eder; Dock'tan ya da menüden pencere yeniden açılabilir.
+private struct LaunchWindowGate: NSViewRepresentable {
+    static let delay: Duration = .milliseconds(600)
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        Task { @MainActor in
+            guard AppState.shared.launchGatePending, let window = view.window else { return }
+            AppState.shared.launchGatePending = false
+            window.alphaValue = 0
+            try? await Task.sleep(for: Self.delay)
+            if AppState.shared.backgroundSession {
+                window.close()
+            }
+            window.alphaValue = 1
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }

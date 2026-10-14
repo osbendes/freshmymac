@@ -26,11 +26,11 @@
 - **Akıllı Temizlik**: uygulama önbellekleri, kullanıcı günlükleri, Çöp Kutusu, tarayıcı önbelleği/geçmişi/çerezleri, Quick Look küçük resimleri, Xcode DerivedData, kullanılamayan simülatörler, Homebrew ve npm önbellekleri. Her görev temizlemeden önce boyutunu gösterir.
 - **İnternet Önbelleğini Temizle**: Windows'taki `ipconfig /flushdns` komutunun macOS karşılığı (DNS + ARP önbelleği).
 - **Belleği Boşalt**: etkin olmayan RAM'i serbest bırakır (`purge`).
-- **Büyük ve Eski Dosyalar**: İndirilenler, Masaüstü, Belgeler, Filmler ve Müzik'teki büyük ya da uzun süredir açılmayan dosyaları türe göre gruplar. Dosyalar silinmez, Çöp Kutusu'na taşınır.
+- **Büyük ve Eski Dosyalar**: İndirilenler, Masaüstü, Belgeler, Filmler ve Müzik'teki büyük ya da uzun süredir açılmayan dosyaları bulur. Hepsini tek listede ya da türe göre gösterir; boyuta, ada ya da tarihe göre sıralar. Dosyalar silinmez, Çöp Kutusu'na taşınır.
 - **Uygulama Kalıntıları**: kaldırılmış uygulamaların geride bıraktığı tercih, önbellek ve destek dosyalarını bulur.
 - **Açılış Öğeleri**: LaunchAgent/LaunchDaemon listesini gösterir, programı artık bulunmayan sahipsiz öğeleri işaretler.
-- **Tek Tık Temizlik**: bir kez seçtiğiniz ön ayar. Masaüstü widget'ından, menü çubuğundan ya da günlük/haftalık zamanlamayla çalışır.
-- **Masaüstü widget'ı**: üç boyut. Büyük boyda görevleri doğrudan masaüstünden seçebilirsiniz.
+- **Tek Tık Temizlik**: bir kez seçtiğiniz ön ayar. Masaüstü widget'ından, Genel Bakış ekranından, menü çubuğundan ya da günlük/haftalık zamanlamayla çalışır.
+- **Masaüstü widget'ları** uygulama penceresini açmadan arka planda temizler; ilerleme animasyonu ve sonucu gösterir. Küçük ya da orta widget'a sağ tıklayıp **Widget'ı Düzenle** ile görevlerini seçebilirsiniz; büyük boyda görevler doğrudan masaüstünden işaretlenir.
 - **Açık ve koyu tema**, **Türkçe ve İngilizce**. "Sistem" seçiliyse sistem dili Türkçe olduğunda Türkçe, diğer dillerde İngilizce açılır.
 
 <p align="center">

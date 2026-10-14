@@ -4,6 +4,8 @@ import SwiftUI
 struct OverviewView: View {
     @Environment(AppState.self) private var state
     let navigate: (Screen) -> Void
+    /// Son Tek Tık temizliğinde boşaltılan alan; birkaç saniye gösterilir.
+    @State private var cleanResult: Int64?
 
     private struct Slice: Identifiable {
         let id: String
@@ -150,23 +152,70 @@ struct OverviewView: View {
     }
 
     private var actionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Circle().fill(Theme.acc).frame(width: 7, height: 7)
-                Text(state.cleaner.isScanning ? L("Taranıyor…", "Scanning…") : L("\(Format.bytes(cleanable)) temizlenebilir alan bulundu.", "Found \(Format.bytes(cleanable)) of cleanable space."))
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.mute)
-            }
-            HStack(spacing: 10) {
-                Button(L("Büyük Dosyaları Bul", "Find Large Files")) { navigate(.largeFiles) }.buttonStyle(.pill)
-                Button(L("Kalıntıları Bul", "Find Leftovers")) { navigate(.leftovers) }.buttonStyle(.pill)
-                Button { navigate(.cleanup) } label: {
-                    Label(L("Akıllı Temizliğe Git", "Go to Smart Cleanup"), systemImage: "arrow.right").labelStyle(TrailingIcon())
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Circle().fill(Theme.acc).frame(width: 7, height: 7)
+                    Text(state.cleaner.isScanning ? L("Taranıyor…", "Scanning…") : L("\(Format.bytes(cleanable)) temizlenebilir alan bulundu.", "Found \(Format.bytes(cleanable)) of cleanable space."))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.mute)
                 }
-                .buttonStyle(.pillPrimary)
+                HStack(spacing: 10) {
+                    Button(L("Büyük Dosyaları Bul", "Find Large Files")) { navigate(.largeFiles) }.buttonStyle(.pill)
+                    Button(L("Kalıntıları Bul", "Find Leftovers")) { navigate(.leftovers) }.buttonStyle(.pill)
+                    Button { navigate(.cleanup) } label: {
+                        Label(L("Akıllı Temizlik", "Smart Cleanup"), systemImage: "arrow.right").labelStyle(TrailingIcon())
+                    }
+                    .buttonStyle(.pill)
+                }
             }
+            Spacer(minLength: 8)
+            quickCleanButton
         }
         .card(padding: 20)
+    }
+
+    /// Widget'la aynı iş: Tek Tık ön ayarını çalıştırır, ilerleyişi ve sonucu düğmenin üzerinde gösterir.
+    private var quickCleanButton: some View {
+        let cleaning = state.cleaner.isCleaning
+        return VStack(alignment: .trailing, spacing: 6) {
+            Button {
+                Task { await runQuickClean() }
+            } label: {
+                HStack(spacing: 8) {
+                    if cleaning {
+                        ProgressView().controlSize(.small).tint(Theme.onAcc)
+                        Text(L("Temizleniyor…", "Cleaning…"))
+                    } else if let freed = cleanResult {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text(L("\(Format.bytes(freed)) boşaltıldı", "\(Format.bytes(freed)) freed"))
+                            .contentTransition(.numericText())
+                    } else {
+                        Image(systemName: "sparkles")
+                        Text(L("Tek Tık Temizle", "One-Click Clean"))
+                    }
+                }
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                .id(cleaning ? "cleaning" : (cleanResult == nil ? "idle" : "done"))
+            }
+            .buttonStyle(PillButton(primary: cleanResult == nil, large: true))
+            .disabled(cleaning || state.presetTasks.isEmpty)
+            .help(L("Ayarlar'daki Tek Tık Temizlik ön ayarını çalıştırır (widget'la aynı)",
+                    "Runs the One-Click Clean preset from Settings (same as the widget)"))
+            Text(L("\(state.presetTasks.count) görev · ≈ \(Format.bytes(state.presetBytes))",
+                   "\(state.presetTasks.count) tasks · ≈ \(Format.bytes(state.presetBytes))"))
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.mute)
+                .monospacedDigit()
+        }
+        .fixedSize()
+    }
+
+    private func runQuickClean() async {
+        let freed = await state.quickClean()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { cleanResult = freed }
+        try? await Task.sleep(for: .seconds(6))
+        withAnimation(.easeOut) { cleanResult = nil }
     }
 
     private var diskSubtitle: String {

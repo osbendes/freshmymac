@@ -84,6 +84,41 @@ enum FileKind: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Sonuçların gösterimi: tek liste ya da türe göre kartlar.
+enum LargeFileGrouping: String, CaseIterable, Identifiable, Sendable {
+    case all, byKind
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: L("Tümü", "All files")
+        case .byKind: L("Türe göre", "By type")
+        }
+    }
+}
+
+enum LargeFileSort: String, CaseIterable, Identifiable, Sendable {
+    case size, name, date
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .size: L("Boyut", "Size")
+        case .name: L("Ad", "Name")
+        case .date: L("Tarih", "Date")
+        }
+    }
+
+    /// Boyut: büyükten küçüğe · Ad: A→Z · Tarih: en eskiden yeniye (eski dosyaları bulmak için).
+    func sorted(_ files: [FoundFile]) -> [FoundFile] {
+        switch self {
+        case .size: files.sorted { $0.size > $1.size }
+        case .name: files.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .date: files.sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+        }
+    }
+}
+
 struct LargeFileCriteria: Sendable {
     var scopes: Set<LargeFileScope>
     var mode: LargeFileMode

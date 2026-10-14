@@ -1,0 +1,9 @@
+/* Widget yapılandırması ve App Intent'ler (anahtarlar İngilizce kaynak metinlerdir). */
+"One-Click Clean" = "Tek Tık Temizlik";
+"Choose which cleanups this widget runs. Leave empty to use the One-Click preset from the app." = "Bu widget'ın hangi temizlikleri yapacağını seçin. Boş bırakırsanız uygulamadaki Tek Tık ön ayarı kullanılır.";
+"Tasks" = "Görevler";
+"Task" = "Görev";
+"Cleanup Task" = "Temizlik Görevi";
+"Run cleanup" = "Temizliği çalıştır";
+"Action" = "İşlem";
+"Toggle cleanup task" = "Temizlik görevini seç";

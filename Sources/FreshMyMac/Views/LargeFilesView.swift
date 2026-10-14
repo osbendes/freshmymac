@@ -33,18 +33,28 @@ struct LargeFilesView: View {
                         )
                         .card()
                     } else {
-                        HStack {
+                        HStack(spacing: 12) {
                             SelectAllToggle(ids: model.allIDs, selection: $model.selection)
-                            Spacer()
                             if !model.selection.isEmpty {
                                 Text(L("\(model.selection.count) öğe seçili · \(Format.bytes(model.selectedBytes))", "\(model.selection.count) items selected · \(Format.bytes(model.selectedBytes))"))
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(Theme.mute)
                             }
+                            Spacer(minLength: 8)
+                            Segmented(selection: $model.grouping, options: LargeFileGrouping.allCases, title: \.title)
+                            HStack(spacing: 6) {
+                                Text(L("Sırala", "Sort")).font(.system(size: 12)).foregroundStyle(Theme.mute)
+                                Segmented(selection: $model.sort, options: LargeFileSort.allCases, title: \.title)
+                            }
                         }
                         .padding(.horizontal, 4)
-                        ForEach(model.kinds) { kind in
-                            kindCard(kind, files: model.files(of: kind), selection: $model.selection)
+                        switch model.grouping {
+                        case .all:
+                            allFilesCard(model.sortedResults, selection: $model.selection)
+                        case .byKind:
+                            ForEach(model.kinds) { kind in
+                                kindCard(kind, files: model.files(of: kind), selection: $model.selection)
+                            }
                         }
                     }
                 }
@@ -95,6 +105,27 @@ struct LargeFilesView: View {
             .fixedSize()
         }
         .card(padding: 14)
+    }
+
+    /// "Tümü" görünümü: seçilen sıralamayla tek liste. Satır sayısı 1000'e çıkabildiği için tembel yığın.
+    private func allFilesCard(_ files: [FoundFile], selection: Binding<Set<URL>>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                SectionLabel(L("Tüm dosyalar", "All files"))
+                Spacer()
+                Text(L("\(files.count) dosya · \(Format.bytes(files.reduce(0) { $0 + $1.size }))", "\(files.count) files · \(Format.bytes(files.reduce(0) { $0 + $1.size }))"))
+                    .font(Theme.mono(12))
+                    .foregroundStyle(Theme.mute)
+            }
+            .padding(.bottom, 4)
+            LazyVStack(spacing: 0) {
+                ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
+                    if index > 0 { RowDivider(leading: 70) }
+                    row(file, selection: selection)
+                }
+            }
+        }
+        .card(padding: 18)
     }
 
     private func kindCard(_ kind: FileKind, files: [FoundFile], selection: Binding<Set<URL>>) -> some View {

@@ -26,11 +26,11 @@
 - **Smart Cleanup**: app caches, user logs, Trash, browser caches/history/cookies, Quick Look thumbnails, Xcode DerivedData, unavailable simulators, Homebrew and npm caches. Every task shows its size before you clean.
 - **Clear Internet Cache**: the macOS equivalent of Windows' `ipconfig /flushdns` (DNS + ARP cache).
 - **Free Up Memory**: releases inactive RAM (`purge`).
-- **Large & Old Files**: finds big or long-unused files in Downloads, Desktop, Documents, Movies and Music, grouped by type. Files are moved to the Trash, not deleted.
+- **Large & Old Files**: finds big or long-unused files in Downloads, Desktop, Documents, Movies and Music. Show them all or grouped by type, sorted by size, name or date. Files are moved to the Trash, not deleted.
 - **App Leftovers**: finds preferences, caches and support files left behind by uninstalled apps.
 - **Launch Items**: lists LaunchAgents/LaunchDaemons and flags orphaned ones whose program no longer exists.
-- **One-Click Clean**: a preset you choose once, run from the desktop widget, the menu bar or on a daily/weekly schedule.
-- **Desktop widget** in three sizes; the large one lets you pick tasks right on the desktop.
+- **One-Click Clean**: a preset you choose once, run from the desktop widget, the Overview screen, the menu bar or on a daily/weekly schedule.
+- **Desktop widgets** clean in the background without opening the app window, with a progress animation and the result. Right-click the small or medium widget › **Edit Widget** to choose its tasks; the large one lets you tick tasks right on the desktop.
 - **Light and dark themes**, **Turkish and English**. "System" uses Turkish when the system language is Turkish, English otherwise.
 
 <p align="center">

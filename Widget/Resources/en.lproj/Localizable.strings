@@ -1,0 +1,9 @@
+/* Widget configuration and App Intents (keys are the English source strings). */
+"One-Click Clean" = "One-Click Clean";
+"Choose which cleanups this widget runs. Leave empty to use the One-Click preset from the app." = "Choose which cleanups this widget runs. Leave empty to use the One-Click preset from the app.";
+"Tasks" = "Tasks";
+"Task" = "Task";
+"Cleanup Task" = "Cleanup Task";
+"Run cleanup" = "Run cleanup";
+"Action" = "Action";
+"Toggle cleanup task" = "Toggle cleanup task";
