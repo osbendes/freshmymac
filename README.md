@@ -59,14 +59,15 @@ Then right-click the desktop › **Edit Widgets…** and search for FreshMyMac.
 ## Permissions
 
 - **Full Disk Access** is needed for the Trash, Safari history and some app containers. Rows that can't be read show *No access*, and clicking it opens the right settings pane.
-- **Administrator password**: Clear Internet Cache and Free Up Memory run as root. When several of these are selected, the password is asked once.
+- **Administrator permission (one time)**: Clear Internet Cache and Free Up Memory run as root. On first launch FreshMyMac offers to grant this once: after a single password prompt it installs `/etc/sudoers.d/freshmymac`, which lets only these exact commands run without a password:
+  `dscacheutil -flushcache`, `killall -HUP mDNSResponder`, `arp -a -d`, `purge`. The rule is checked with `visudo` before it is installed and can be removed under Settings › Permissions. Without it, the password is asked once per cleanup.
 
 ## Safety
 
 - Cache, log and Trash tasks delete permanently. Large files, leftovers and launch items are moved to the Trash and can be restored.
 - Browser history and cookie tasks are skipped while the browser is running.
 - The leftover scan is conservative: if any app from the same developer (e.g. `com.google`) is installed or running, none of that developer's files are listed.
-- Scheduled cleanups skip tasks that need a password or an open browser to close.
+- Scheduled cleanups skip tasks that would need a password (when the one-time permission isn't granted) or need a browser to be closed.
 
 ## Project layout
 

@@ -59,14 +59,15 @@ Ardından masaüstüne sağ tıklayın › **Widget'ları Düzenle…** › "Fre
 ## İzinler
 
 - **Tam Disk Erişimi**: Çöp Kutusu, Safari geçmişi ve bazı uygulama kapsayıcıları için gerekir. Okunamayan satırlarda *Erişim yok* yazar, tıklayınca ilgili ayar açılır.
-- **Yönetici şifresi**: İnternet Önbelleğini Temizle ve Belleği Boşalt root yetkisiyle çalışır. Birden fazlası seçiliyse şifre bir kez sorulur.
+- **Yönetici izni (tek seferlik)**: İnternet Önbelleğini Temizle ve Belleği Boşalt root yetkisiyle çalışır. İlk açılışta FreshMyMac bu izni bir kez vermeyi önerir: tek bir şifre isteminden sonra `/etc/sudoers.d/freshmymac` kurulur ve yalnızca şu komutlar, bu argümanlarla, şifresiz çalışabilir:
+  `dscacheutil -flushcache`, `killall -HUP mDNSResponder`, `arp -a -d`, `purge`. Kural kurulmadan önce `visudo` ile doğrulanır ve Ayarlar › İzinler'den kaldırılabilir. İzin verilmezse şifre her temizlikte bir kez sorulur.
 
 ## Güvenlik
 
 - Önbellek, günlük ve Çöp Kutusu görevleri kalıcı olarak siler. Büyük dosyalar, kalıntılar ve açılış öğeleri Çöp Kutusu'na taşınır, geri alınabilir.
 - Tarayıcı geçmişi ve çerez görevleri tarayıcı açıkken atlanır.
 - Kalıntı taraması temkinlidir: aynı geliştiricinin (ör. `com.google`) kurulu ya da çalışan bir uygulaması varsa o geliştiriciye ait hiçbir dosya listelenmez.
-- Zamanlanmış temizlik, şifre isteyen ya da tarayıcının kapalı olmasını gerektiren görevleri atlar.
+- Zamanlanmış temizlik, şifre gerektirecek (tek seferlik izin verilmemişse) ya da tarayıcının kapalı olmasını gerektiren görevleri atlar.
 
 ## Proje yapısı
 
