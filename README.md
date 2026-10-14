@@ -13,6 +13,14 @@
   <img src="docs/images/hero-en.png" alt="FreshMyMac: the main window and the menu bar">
 </p>
 
+## Download
+
+**[Download the latest release](https://github.com/osbendes/freshmymac/releases/latest)**: `FreshMyMac-x.y.z.zip`, for Apple Silicon and Intel, macOS 14 or later.
+
+1. Unzip it and drag **FreshMyMac.app** to your Applications folder.
+2. Open it. Because the app isn't notarized by Apple, macOS blocks the first launch: close the warning, go to **System Settings › Privacy & Security** and click **Open Anyway** at the bottom. This is needed only once.
+3. On first launch FreshMyMac offers the one-time administrator permission and Full Disk Access (see [Permissions](#permissions)).
+
 ## Features
 
 - **Smart Cleanup**: app caches, user logs, Trash, browser caches/history/cookies, Quick Look thumbnails, Xcode DerivedData, unavailable simulators, Homebrew and npm caches. Every task shows its size before you clean.
@@ -36,7 +44,7 @@
 
 ## Build and run
 
-Quick run during development (no widget, notifications or launch-at-login):
+To build from source instead, quick run during development (no widget, notifications or launch-at-login):
 
 ```bash
 swift run
@@ -55,6 +63,8 @@ BUNDLE_ID=com.example.FreshMyMac SIGN_IDENTITY="Apple Development: you@example.c
 ```
 
 Then right-click the desktop › **Edit Widgets…** and search for FreshMyMac.
+
+`./scripts/build-app.sh --release` builds the downloadable zip: a universal (Apple Silicon + Intel) app, ad-hoc signed so the release doesn't carry the developer's certificate details.
 
 ## Permissions
 

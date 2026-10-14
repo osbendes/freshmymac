@@ -13,6 +13,14 @@
   <img src="docs/images/hero-tr.png" alt="FreshMyMac: ana pencere ve menü çubuğu">
 </p>
 
+## İndir
+
+**[Son sürümü indirin](https://github.com/osbendes/freshmymac/releases/latest)**: `FreshMyMac-x.y.z.zip`. Apple Silicon ve Intel Mac'ler için, macOS 14 veya üstü.
+
+1. Zip'i açın ve **FreshMyMac.app** dosyasını Uygulamalar klasörüne sürükleyin.
+2. Uygulamayı açın. Uygulama Apple tarafından noter onaylı olmadığı için macOS ilk açılışı engeller: uyarıyı kapatın, **Sistem Ayarları › Gizlilik ve Güvenlik** bölümüne gidin ve en alttaki **Yine de Aç** düğmesine basın. Bu yalnızca bir kez gerekir.
+3. İlk açılışta FreshMyMac tek seferlik yönetici iznini ve Tam Disk Erişimi'ni önerir (ayrıntılar aşağıdaki İzinler bölümünde).
+
 ## Özellikler
 
 - **Akıllı Temizlik**: uygulama önbellekleri, kullanıcı günlükleri, Çöp Kutusu, tarayıcı önbelleği/geçmişi/çerezleri, Quick Look küçük resimleri, Xcode DerivedData, kullanılamayan simülatörler, Homebrew ve npm önbellekleri. Her görev temizlemeden önce boyutunu gösterir.
@@ -36,7 +44,7 @@
 
 ## Derleme ve çalıştırma
 
-Geliştirme sırasında hızlı çalıştırma (widget, bildirim ve oturum açılışı olmadan):
+Kaynaktan derlemek isterseniz, geliştirme sırasında hızlı çalıştırma (widget, bildirim ve oturum açılışı olmadan):
 
 ```bash
 swift run
@@ -55,6 +63,8 @@ BUNDLE_ID=com.ornek.FreshMyMac SIGN_IDENTITY="Apple Development: siz@ornek.com (
 ```
 
 Ardından masaüstüne sağ tıklayın › **Widget'ları Düzenle…** › "FreshMyMac" arayın.
+
+`./scripts/build-app.sh --release` indirilebilir zip dosyasını üretir: universal (Apple Silicon + Intel) uygulama, sürümde geliştiricinin sertifika bilgileri bulunmasın diye ad-hoc imzalı.
 
 ## İzinler
 

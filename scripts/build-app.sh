@@ -2,13 +2,23 @@
 # Release derlemesi yapıp build/FreshMyMac.app paketini (widget uzantısıyla birlikte) oluşturur.
 #   ./scripts/build-app.sh            → build/FreshMyMac.app
 #   ./scripts/build-app.sh --install  → ayrıca ~/Applications'a kurar ve widget'ı kaydeder
+#   ./scripts/build-app.sh --release  → GitHub sürümü: Apple Silicon + Intel (universal), ad-hoc imza,
+#                                       build/FreshMyMac-<sürüm>.zip
+# --release ad-hoc imzalar: Apple Development sertifikasının adında geliştiricinin e-postası bulunur
+# ve imza uygulamaya gömülür; dağıtılan dosyada bu bilgi olmamalı.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Kendi kimliğinizle derlemek için: BUNDLE_ID=com.ornek.FreshMyMac ./scripts/build-app.sh
 BUNDLE_ID="${BUNDLE_ID:-com.osbendes.FreshMyMac}"
-VERSION="0.2.0"
-ARCH="$(uname -m)"
+VERSION="${VERSION:-0.2.0}"
+MODE="${1:-}"
+if [[ $MODE == --release ]]; then
+    ARCHS=(arm64 x86_64)
+    SIGN_IDENTITY="-"
+else
+    ARCHS=("$(uname -m)")
+fi
 SDK="$(xcrun --show-sdk-path --sdk macosx)"
 SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
 SDK_BUILD="$(xcrun --sdk macosx --show-sdk-build-version)"
@@ -40,8 +50,10 @@ else
     echo "İmza: $SIGN_ID"
 fi
 
-swift build -c release
-BIN="$(swift build -c release --show-bin-path)/FreshMyMac"
+ARCH_FLAGS=()
+for arch in "${ARCHS[@]}"; do ARCH_FLAGS+=(--arch "$arch"); done
+swift build -c release "${ARCH_FLAGS[@]}"
+BIN="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)/FreshMyMac"
 APP="build/FreshMyMac.app"
 WIDGET="$APP/Contents/PlugIns/FreshMyMacWidget.appex"
 
@@ -87,17 +99,24 @@ mkdir -p "$INTERMEDIATE" "$WIDGET/Contents/Resources"
 WIDGET_SOURCES=(Widget/*.swift Sources/FreshMyMac/Shared/*.swift)
 printf '%s\n' '["AppIntent","AppEntity","AppEnum","TransientEntity","EntityQuery","DynamicOptionsProvider","AppShortcutsProvider","AppIntentsPackage","_IntentValueRepresentable","AnyResolverProviding","_AssistantIntentsProvider"]' > "$INTERMEDIATE/protocols.json"
 
-swiftc -O -wmo -parse-as-library -module-name FreshMyMacWidget -application-extension \
-    -target "$ARCH-apple-macos14.0" -sdk "$SDK" \
-    -emit-const-values-path "$INTERMEDIATE/FreshMyMacWidget.swiftconstvalues" \
-    -Xfrontend -const-gather-protocols-file -Xfrontend "$INTERMEDIATE/protocols.json" \
-    -Xlinker -e -Xlinker _NSExtensionMain -Xlinker -application_extension \
-    "${WIDGET_SOURCES[@]}" \
-    -o "$WIDGET/Contents/MacOS/FreshMyMacWidget"
+# Her mimari ayrı derlenip lipo ile tek dosyada birleştirilir.
+SLICES=()
+for arch in "${ARCHS[@]}"; do
+    swiftc -O -wmo -parse-as-library -module-name FreshMyMacWidget -application-extension \
+        -target "$arch-apple-macos14.0" -sdk "$SDK" \
+        -emit-const-values-path "$INTERMEDIATE/FreshMyMacWidget-$arch.swiftconstvalues" \
+        -Xfrontend -const-gather-protocols-file -Xfrontend "$INTERMEDIATE/protocols.json" \
+        -Xlinker -e -Xlinker _NSExtensionMain -Xlinker -application_extension \
+        "${WIDGET_SOURCES[@]}" \
+        -o "$INTERMEDIATE/FreshMyMacWidget-$arch"
+    SLICES+=("$INTERMEDIATE/FreshMyMacWidget-$arch")
+done
+lipo -create "${SLICES[@]}" -output "$WIDGET/Contents/MacOS/FreshMyMacWidget"
 
 # Widget'taki seçim kutuları (AppIntent) için Xcode'un ürettiği Metadata.appintents paketi.
 printf '%s\n' "${WIDGET_SOURCES[@]:A}" > "$INTERMEDIATE/sources.txt"
-echo "$PWD/$INTERMEDIATE/FreshMyMacWidget.swiftconstvalues" > "$INTERMEDIATE/constvalues.txt"
+# Metadata mimariden bağımsızdır; ilk mimarinin çıktısı yeterli.
+echo "$PWD/$INTERMEDIATE/FreshMyMacWidget-${ARCHS[1]}.swiftconstvalues" > "$INTERMEDIATE/constvalues.txt"
 xcrun appintentsmetadataprocessor \
     --output "$WIDGET/Contents/Resources" \
     --toolchain-dir "$(dirname "$(dirname "$(dirname "$(xcrun -f swiftc)")")")" \
@@ -107,8 +126,8 @@ xcrun appintentsmetadataprocessor \
     --platform-family macOS \
     --deployment-target 14.0 \
     --bundle-identifier "$BUNDLE_ID.Widget" \
-    --target-triple "$ARCH-apple-macos14.0" \
-    --binary-file "$WIDGET/Contents/MacOS/FreshMyMacWidget" \
+    --target-triple "${ARCHS[1]}-apple-macos14.0" \
+    --binary-file "$INTERMEDIATE/FreshMyMacWidget-${ARCHS[1]}" \
     --source-file-list "$INTERMEDIATE/sources.txt" \
     --swift-const-vals-list "$INTERMEDIATE/constvalues.txt" \
     --force
@@ -141,7 +160,15 @@ codesign --force --sign "$SIGN_ID" --timestamp=none "$APP"
 codesign --verify --deep --strict "$APP"
 echo "Hazır: $APP"
 
-if [[ "${1:-}" == "--install" ]]; then
+if [[ $MODE == --release ]]; then
+    ZIP="build/FreshMyMac-$VERSION.zip"
+    rm -f "$ZIP"
+    # ditto, Finder'ın sıkıştırmasıyla aynı: imza ve genişletilmiş öznitelikler korunur.
+    ditto -c -k --keepParent "$APP" "$ZIP"
+    echo "Sürüm dosyası: $ZIP ($(lipo -archs "$APP/Contents/MacOS/FreshMyMac"))"
+fi
+
+if [[ $MODE == --install ]]; then
     DEST="$HOME/Applications/FreshMyMac.app"
     mkdir -p "$HOME/Applications"
     pkill -x FreshMyMac 2>/dev/null || true
