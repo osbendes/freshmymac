@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/overview.png" alt="Overview screen">
+  <img src="docs/images/hero-en.png" alt="FreshMyMac: the main window and the menu bar">
 </p>
 
 ## Features
@@ -26,8 +26,7 @@
 - **Light and dark themes**, **Turkish and English**. "System" uses Turkish when the system language is Turkish, English otherwise.
 
 <p align="center">
-  <img src="docs/images/cleanup.png" width="49%" alt="Smart Cleanup">
-  <img src="docs/images/widgets.png" width="49%" alt="Desktop widgets">
+  <img src="docs/images/screens-en.png" alt="Overview, Smart Cleanup, after a cleanup, Large & Old Files, App Leftovers, Launch Items, Settings, menu bar">
 </p>
 
 ## Requirements
@@ -118,6 +117,14 @@ swift build
 ```
 
 `-screen`: `overview`, `cleanup`, `largeFiles`, `leftovers`, `launchItems`, `settings` · `-appearanceMode`: `system`, `light`, `dark` · `-appLanguage`: `system`, `tr`, `en`
+
+The README images use sample content (no real files or user names) and are made with:
+
+```bash
+./scripts/build-app.sh
+./scripts/screenshots.sh build/shots            # every screen, both languages and themes (-demo YES)
+swift scripts/make_promo.swift build/shots docs/images build/stories
+```
 
 ## License
 

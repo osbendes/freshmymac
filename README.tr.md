@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/overview.png" alt="Genel Bakış ekranı">
+  <img src="docs/images/hero-tr.png" alt="FreshMyMac: ana pencere ve menü çubuğu">
 </p>
 
 ## Özellikler
@@ -26,8 +26,7 @@
 - **Açık ve koyu tema**, **Türkçe ve İngilizce**. "Sistem" seçiliyse sistem dili Türkçe olduğunda Türkçe, diğer dillerde İngilizce açılır.
 
 <p align="center">
-  <img src="docs/images/cleanup.png" width="49%" alt="Akıllı Temizlik">
-  <img src="docs/images/widgets.png" width="49%" alt="Masaüstü widget'ları">
+  <img src="docs/images/screens-tr.png" alt="Genel Bakış, Akıllı Temizlik, temizlikten sonra, Büyük ve Eski Dosyalar, Uygulama Kalıntıları, Açılış Öğeleri, Ayarlar, menü çubuğu">
 </p>
 
 ## Gereksinimler
@@ -118,6 +117,14 @@ swift build
 ```
 
 `-screen`: `overview`, `cleanup`, `largeFiles`, `leftovers`, `launchItems`, `settings` · `-appearanceMode`: `system`, `light`, `dark` · `-appLanguage`: `system`, `tr`, `en`
+
+README görselleri örnek içerik kullanır (gerçek dosya ya da kullanıcı adı yok) ve şöyle üretilir:
+
+```bash
+./scripts/build-app.sh
+./scripts/screenshots.sh build/shots            # her ekran, iki dil ve iki tema (-demo YES)
+swift scripts/make_promo.swift build/shots docs/images build/stories
+```
 
 ## Lisans
 

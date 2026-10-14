@@ -47,8 +47,14 @@ enum Snapshot {
         window.orderOut(nil)
     }
 
-    private static func write(_ view: NSView, to path: String) {
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+    /// Görünümü, bulunduğu ekrandan bağımsız olarak 2x çözünürlükte PNG'ye yazar.
+    private static func write(_ view: NSView, to path: String, scale: CGFloat = 2) {
+        let size = view.bounds.size
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale),
+                                         pixelsHigh: Int(size.height * scale), bitsPerSample: 8, samplesPerPixel: 4,
+                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0) else { return }
+        rep.size = size
         view.cacheDisplay(in: view.bounds, to: rep)
         let url = URL(filePath: (path as NSString).expandingTildeInPath)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
